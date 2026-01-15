@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { useRooms } from "./useRooms";
-import { getRoomCalendarEvents, getBookingAppointments, type BookingAppointment } from "../services/graphService";
+import { getRoomCalendarEvents, getBookingAppointmentsViaServer, type BookingAppointment } from "../services/graphService";
 import type { CalendarEvent } from "../types/calendar";
 import { startOfMonth, endOfMonth, parseISO, isSameDay, differenceInMinutes } from "date-fns";
-
-// The booking business ID for "Rezervare săli - The Youth"
-const BOOKING_BUSINESS_ID = "RezervaresliTheYouth@rotineret.ro";
 
 // Helper to match booking appointments with calendar events
 function enrichEventsWithBookingData(
@@ -114,12 +111,10 @@ export const useCalendarEvents = (initialDate: Date = new Date()) => {
                 }
             });
 
-            // Fetch booking appointments in parallel
+            // Fetch booking appointments via server API (works for ALL users)
             let bookingAppointments: BookingAppointment[] = [];
             try {
-                bookingAppointments = await getBookingAppointments(
-                    token,
-                    BOOKING_BUSINESS_ID,
+                bookingAppointments = await getBookingAppointmentsViaServer(
                     start.toISOString(),
                     end.toISOString()
                 );

@@ -121,7 +121,7 @@ export async function getBookingBusinesses(accessToken: string): Promise<Booking
     return data.value;
 }
 
-// Get appointments from a booking business
+// Get appointments from a booking business (uses user token - only works for admins)
 export async function getBookingAppointments(
     accessToken: string,
     bookingBusinessId: string,
@@ -144,4 +144,30 @@ export async function getBookingAppointments(
 
     const data = await response.json();
     return data.value;
+}
+
+// Get booking appointments via server-side PHP API (works for ALL users)
+// This uses application credentials instead of user tokens
+export async function getBookingAppointmentsViaServer(
+    startDateTime: string,
+    endDateTime: string
+): Promise<BookingAppointment[]> {
+    const apiUrl = '/api/bookings.php';
+
+    try {
+        const response = await fetch(
+            `${apiUrl}?start=${encodeURIComponent(startDateTime)}&end=${encodeURIComponent(endDateTime)}`
+        );
+
+        if (!response.ok) {
+            console.error('Server bookings API failed:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Failed to fetch bookings from server:', error);
+        return [];
+    }
 }
