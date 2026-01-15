@@ -1,27 +1,29 @@
 import type { RoomId } from "../types/room";
 
-// Settings stored in a public JSON endpoint
-// For production, use a proper backend or Azure Blob Storage
-// This uses a simple JSON file approach
+// Settings stored on server via PHP API
+// This ensures settings are shared across all users
 
 interface GlobalSettings {
     hiddenRoomIds: RoomId[];
-    lastUpdated: string;
-    updatedBy: string;
+    lastUpdated?: string;
+    updatedBy?: string;
 }
 
-const SETTINGS_KEY = "the_youth_calendar_global_settings";
+// API endpoint - use relative path for production, absolute for development
+const getApiUrl = () => {
+    if (window.location.hostname === 'localhost') {
+        return '/api/settings.php';
+    }
+    return '/api/settings.php';
+};
 
-// For now, we'll use localStorage but with a shared key approach
-// In production, replace with an API call to your backend
 export const settingsService = {
-    // Get global settings (in production, this would be an API call)
+    // Get global settings from server
     getGlobalSettings: async (): Promise<GlobalSettings | null> => {
         try {
-            // Try to get from localStorage first
-            const stored = localStorage.getItem(SETTINGS_KEY);
-            if (stored) {
-                return JSON.parse(stored);
+            const response = await fetch(getApiUrl());
+            if (response.ok) {
+                return await response.json();
             }
             return null;
         } catch (error) {
@@ -30,7 +32,7 @@ export const settingsService = {
         }
     },
 
-    // Save global settings (admin only)
+    // Save global settings to server (admin only)
     saveGlobalSettings: async (
         hiddenRoomIds: RoomId[],
         updatedBy: string
@@ -41,8 +43,14 @@ export const settingsService = {
                 lastUpdated: new Date().toISOString(),
                 updatedBy
             };
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-            return true;
+            const response = await fetch(getApiUrl(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            });
+            return response.ok;
         } catch (error) {
             console.error("Failed to save global settings", error);
             return false;
