@@ -3,7 +3,7 @@
 
 import { getBookingBusinesses, getBookingAppointments, type BookingAppointment } from './graphService';
 import { bookingDatabaseService } from './bookingDatabaseService';
-import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 
 type SyncProgressCallback = (progress: { current: number; total: number; monthKey: string }) => void;
 

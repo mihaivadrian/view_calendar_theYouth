@@ -202,7 +202,7 @@ export const DebugPanel: React.FC = () => {
                                     }`}>
                                         {log.message}
                                     </div>
-                                    {log.data && (log.data as unknown[]).length > 0 && (
+                                    {log.data && Array.isArray(log.data) && log.data.length > 0 && (
                                         <pre className="mt-1 text-gray-300 overflow-x-auto text-[10px]">
                                             {JSON.stringify(log.data, null, 2)}
                                         </pre>
