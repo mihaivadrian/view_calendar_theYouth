@@ -89,9 +89,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             officeLocation: graphUser.officeLocation,
                         });
                     }
-                } catch (err: any) {
+                } catch (err) {
                     console.error("Profile fetch failed", err);
-                    setError(err.message || "Failed to fetch profile");
+                    const errorMessage = err instanceof Error ? err.message : "Failed to fetch profile";
+                    setError(errorMessage);
                 } finally {
                     setIsLoading(false);
                 }

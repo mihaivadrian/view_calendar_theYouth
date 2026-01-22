@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
 import type { Room, RoomId } from "../types/room";
 import { settingsService } from "../services/settingsService";
 import { ROOMS_CONFIG } from "../services/roomsConfig";
@@ -15,6 +15,11 @@ interface RoomsContextType {
     isRoomSelected: (roomId: RoomId) => boolean;
     refreshHiddenRooms: () => void;
     isLoadingRooms: boolean;
+    // Filter to show only rooms with events on current day
+    filterToActiveOnly: boolean;
+    setFilterToActiveOnly: (value: boolean) => void;
+    activeRoomIds: RoomId[]; // Rooms that have events on current viewed date
+    setActiveRoomIds: (roomIds: RoomId[]) => void;
 }
 
 const RoomsContext = createContext<RoomsContextType | undefined>(undefined);
@@ -37,6 +42,20 @@ export const RoomsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [hiddenRoomIds, setHiddenRoomIds] = useState<RoomId[]>([]);
     const [selectedRoomIds, setSelectedRoomIds] = useState<RoomId[]>([]);
     const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+    const [filterToActiveOnly, setFilterToActiveOnly] = useState(false);
+    const [activeRoomIds, setActiveRoomIds] = useState<RoomId[]>([]);
+
+    // Track the previous room IDs to detect when rooms actually change
+    const prevRoomIdsRef = useRef<string>("");
+
+    // Load hidden rooms from settings (once on mount)
+    useEffect(() => {
+        const loadHiddenRooms = async () => {
+            const hidden = await settingsService.getHiddenRoomIds();
+            setHiddenRoomIds(hidden);
+        };
+        loadHiddenRooms();
+    }, []);
 
     // Fetch rooms from Graph API
     useEffect(() => {
@@ -48,6 +67,7 @@ export const RoomsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 const token = await getAccessToken();
                 if (token) {
                     const fetchedRooms = await getAllRooms(token);
+                    console.log('[RoomsContext] Fetched rooms from API:', fetchedRooms.map(r => ({ id: r.id, name: r.name })));
 
                     if (fetchedRooms.length > 0) {
                         // Assign colors
@@ -69,24 +89,26 @@ export const RoomsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         fetchRooms();
     }, [isAuthenticated, getAccessToken]);
 
-    // Initialize selection/visibility
+    // Sync selectedRoomIds when rooms change
     useEffect(() => {
-        const loadHiddenRooms = async () => {
-            const hidden = await settingsService.getHiddenRoomIds();
-            setHiddenRoomIds(hidden);
+        if (rooms.length === 0) return;
 
-            // Update selection based on CURRENT rooms (whether static or fetched)
-            const visibleRooms = rooms
-                .filter(r => !hidden.includes(r.id))
+        const currentRoomIdsStr = rooms.map(r => r.id).sort().join(',');
+
+        // Only update if room IDs actually changed
+        if (currentRoomIdsStr !== prevRoomIdsRef.current) {
+            console.log('[RoomsContext] Room IDs changed from:', prevRoomIdsRef.current, 'to:', currentRoomIdsStr);
+            prevRoomIdsRef.current = currentRoomIdsStr;
+
+            // Select all visible rooms
+            const visibleRoomIds = rooms
+                .filter(r => !hiddenRoomIds.includes(r.id))
                 .map(r => r.id);
 
-            // Only reset selection if we don't have a selection matching valid rooms
-            // essentially, when rooms list changes (e.g. from static to dynamic), re-select all visible
-            setSelectedRoomIds(visibleRooms);
-        };
-
-        loadHiddenRooms();
-    }, [rooms]); // Dependency on 'rooms' ensures we re-calc when fetch completes
+            console.log('[RoomsContext] Setting selectedRoomIds to:', visibleRoomIds);
+            setSelectedRoomIds(visibleRoomIds);
+        }
+    }, [rooms, hiddenRoomIds]);
 
     const refreshHiddenRooms = async () => {
         const hidden = await settingsService.getHiddenRoomIds();
@@ -127,7 +149,11 @@ export const RoomsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             deselectAllRooms,
             isRoomSelected,
             refreshHiddenRooms,
-            isLoadingRooms
+            isLoadingRooms,
+            filterToActiveOnly,
+            setFilterToActiveOnly,
+            activeRoomIds,
+            setActiveRoomIds
         }}>
             {children}
         </RoomsContext.Provider>

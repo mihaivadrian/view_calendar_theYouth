@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
+import type { DatesSetArg, EventClickArg } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -7,12 +8,28 @@ import { useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { useRooms } from "../../hooks/useRooms";
 import { EventModal } from "./EventModal";
 import type { CalendarEvent } from "../../types/calendar";
+import { isSameDay, parseISO } from "date-fns";
 
 export const CalendarView: React.FC = () => {
     const calendarRef = useRef<FullCalendar>(null);
     const { events, loading, setDateRange } = useCalendarEvents();
-    const { rooms } = useRooms();
+    const { rooms, setActiveRoomIds, filterToActiveOnly } = useRooms();
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+    // Update active room IDs whenever events or selected date changes
+    useEffect(() => {
+        const roomsWithEventsOnDate = new Set<string>();
+
+        events.forEach(event => {
+            const eventStart = parseISO(event.start.dateTime);
+            if (isSameDay(eventStart, selectedDate) && event.roomId) {
+                roomsWithEventsOnDate.add(event.roomId);
+            }
+        });
+
+        setActiveRoomIds(Array.from(roomsWithEventsOnDate));
+    }, [events, selectedDate, setActiveRoomIds]);
 
     // Helper to get room name by ID
     const getRoomName = (roomId?: string) => {
@@ -21,8 +38,16 @@ export const CalendarView: React.FC = () => {
         return room ? room.name : "";
     };
 
+    // Filter events when "doar cu evenimente azi" is active - show only events from selected date
+    const filteredEvents = filterToActiveOnly
+        ? events.filter(e => {
+            const eventStart = parseISO(e.start.dateTime);
+            return isSameDay(eventStart, selectedDate);
+        })
+        : events;
+
     // FullCalendar events - include room name in title for clarity
-    const calendarEvents = events.map(e => {
+    const calendarEvents = filteredEvents.map(e => {
         const roomName = getRoomName(e.roomId);
         return {
             id: e.id,
@@ -35,17 +60,24 @@ export const CalendarView: React.FC = () => {
         };
     });
 
-    const handleDatesSet = (arg: any) => {
+    const handleDatesSet = (arg: DatesSetArg) => {
+        console.log('=== CALENDAR: handleDatesSet called ===');
+        console.log('Date range:', arg.start, 'to', arg.end);
+        console.log('Current events count:', events.length);
         setDateRange(arg.start, arg.end);
     };
 
-    const handleEventClick = (arg: any) => {
-        setSelectedEvent(arg.event.extendedProps);
+    const handleEventClick = (arg: EventClickArg) => {
+        setSelectedEvent(arg.event.extendedProps as CalendarEvent);
     };
 
-    // Get selected rooms for legend
+    const handleDateClick = (arg: { date: Date }) => {
+        setSelectedDate(arg.date);
+    };
+
+    // Get selected rooms for legend (based on filtered events)
     const selectedRooms = rooms.filter(r =>
-        events.some(e => e.roomId === r.id)
+        filteredEvents.some(e => e.roomId === r.id)
     );
 
     return (
@@ -131,6 +163,7 @@ export const CalendarView: React.FC = () => {
                     events={calendarEvents}
                     datesSet={handleDatesSet}
                     eventClick={handleEventClick}
+                    dateClick={handleDateClick}
                     height="100%"
                     slotMinTime="08:00:00"
                     slotMaxTime="20:00:00"

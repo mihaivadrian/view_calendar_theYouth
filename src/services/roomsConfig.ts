@@ -48,6 +48,10 @@ export const ROOMS_CONFIG: Room[] = [
     }
 ];
 
+// TODO: Move admin emails to server-side configuration
+// This should be fetched from a secure backend API endpoint instead of being hardcoded in client-side code
+// Example: GET /api/admin-config endpoint that returns { adminEmails: [...] }
+// For now, keeping it here for development purposes
 export const ADMIN_EMAILS = [
     "mihai.vilcea@rotineret.ro",
     "admin@rotineret.ro"

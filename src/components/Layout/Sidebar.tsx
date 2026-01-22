@@ -13,7 +13,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     const location = useLocation();
-    const { user } = useAuth();
+    const { user, isAuthenticated } = useAuth();
     const isAdmin = user && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
     const isActive = (path: string) => location.pathname === path;
@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                     </div>
 
                     <div className="mb-6">
-                        <RoomSelector />
+                        {isAuthenticated && <RoomSelector />}
                     </div>
                 </nav>
 

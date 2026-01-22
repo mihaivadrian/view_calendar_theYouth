@@ -1,0 +1,19 @@
+{
+  "name": "youth-calendar-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Youth Calendar - syncs with Microsoft Bookings",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.2.0",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2"
+  }
+}

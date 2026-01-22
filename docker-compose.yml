@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: youth-calendar-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # Persist database outside container
+      - ./backend/data:/app/data
+    environment:
+      - PORT=3001
+      - DB_PATH=/app/data/bookings.db
+      # Microsoft Graph API credentials
+      # IMPORTANT: Set these values!
+      - MS_TENANT_ID=${MS_TENANT_ID}
+      - MS_CLIENT_ID=${MS_CLIENT_ID}
+      - MS_CLIENT_SECRET=${MS_CLIENT_SECRET}
+      - MS_BOOKING_BUSINESS_ID=${MS_BOOKING_BUSINESS_ID}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Frontend (uncomment if you want to serve frontend from Docker too)
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.frontend
+  #   container_name: youth-calendar-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend

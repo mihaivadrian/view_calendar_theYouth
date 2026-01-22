@@ -3,7 +3,7 @@ import { useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { useRooms } from "../../hooks/useRooms";
 import { EventModal } from "./EventModal";
 import type { CalendarEvent } from "../../types/calendar";
-import { format, addDays, subDays, startOfDay, endOfDay, parseISO, differenceInMinutes, startOfMinute } from "date-fns";
+import { format, addDays, subDays, startOfDay, endOfDay, parseISO, differenceInMinutes } from "date-fns";
 import { ro } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -29,7 +29,7 @@ export const DayView: React.FC = () => {
 
     useEffect(() => {
         setDateRange(startOfDay(currentDate), endOfDay(currentDate));
-    }, [currentDate]);
+    }, [currentDate, setDateRange]);
 
     const handlePrevDay = () => setCurrentDate(subDays(currentDate, 1));
     const handleNextDay = () => setCurrentDate(addDays(currentDate, 1));
@@ -38,17 +38,21 @@ export const DayView: React.FC = () => {
     // Time slots generation (8:00 - 20:00)
     const START_HOUR = 8;
     const END_HOUR = 20;
-    const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => i + START_HOUR);
+    const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
 
     // Calculate position for an event
     const getEventStyle = (event: CalendarEvent) => {
         const start = parseISO(event.start.dateTime);
         const end = parseISO(event.end.dateTime);
 
-        let startMinutes = differenceInMinutes(start, startOfMinute(new Date(currentDate).setHours(START_HOUR, 0, 0, 0)));
+        // Create a Date object for the start of the day at START_HOUR
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(START_HOUR, 0, 0, 0);
+
+        let startMinutes = differenceInMinutes(start, dayStart);
         const durationMinutes = differenceInMinutes(end, start);
 
-        // Clip start if before 8am
+        // Clip start if before START_HOUR
         if (startMinutes < 0) {
             // Adjust duration? Visual fix only.
             // For now assume mostly fits.
@@ -79,13 +83,13 @@ export const DayView: React.FC = () => {
                     </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={handlePrevDay} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <button onClick={handlePrevDay} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" aria-label="Ziua anterioară">
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <button onClick={handleToday} className="px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <button onClick={handleToday} className="px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600" aria-label="Mergi la ziua de azi">
                         Azi
                     </button>
-                    <button onClick={handleNextDay} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <button onClick={handleNextDay} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" aria-label="Ziua următoare">
                         <ChevronRight className="w-5 h-5" />
                     </button>
                 </div>
@@ -93,7 +97,7 @@ export const DayView: React.FC = () => {
 
             {/* Timeline Grid */}
             <div className="flex-1 overflow-auto relative">
-                <div className="flex min-w-max h-[1250px]"> {/* Fixed height for 12 hours * 100px + padding */}
+                <div className="flex min-w-max h-[1200px]"> {/* Fixed height for 12 hours * 100px */}
 
                     {/* Time Column */}
                     <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 sticky left-0 z-10">

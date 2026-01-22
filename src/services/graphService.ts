@@ -1,6 +1,14 @@
 import type { CalendarEvent } from "../types/calendar";
 import type { Room } from "../types/room";
 
+// Graph API Room Response Type
+interface GraphRoomResponse {
+    emailAddress: string;
+    displayName: string;
+    capacity?: number;
+    floorLabel?: string;
+}
+
 export async function getRoomCalendarEvents(
     accessToken: string,
     roomEmail: string,
@@ -47,8 +55,7 @@ export async function getAllRooms(accessToken: string): Promise<Room[]> {
     const data = await response.json();
 
     // Transform Graph API room data to our Room interface
-    // @ts-ignore
-    return data.value.map((room: any) => ({
+    return (data.value as GraphRoomResponse[]).map((room) => ({
         id: room.emailAddress, // Use email as stable ID
         name: room.displayName,
         email: room.emailAddress,
@@ -122,6 +129,7 @@ export async function getBookingBusinesses(accessToken: string): Promise<Booking
 }
 
 // Get appointments from a booking business (uses user token - only works for admins)
+// Handles pagination to fetch ALL bookings
 export async function getBookingAppointments(
     accessToken: string,
     bookingBusinessId: string,
@@ -129,21 +137,55 @@ export async function getBookingAppointments(
     endDateTime: string
 ): Promise<BookingAppointment[]> {
     // Use calendarView for date range filtering
-    const endpoint = `https://graph.microsoft.com/v1.0/solutions/bookingBusinesses/${encodeURIComponent(bookingBusinessId)}/calendarView?start=${startDateTime}&end=${endDateTime}`;
+    // Request all important fields including customers and their custom question answers
+    // Add $top=999 to get more results per page
+    const baseEndpoint = `https://graph.microsoft.com/v1.0/solutions/bookingBusinesses/${encodeURIComponent(bookingBusinessId)}/calendarView?start=${startDateTime}&end=${endDateTime}&$select=id,serviceId,serviceName,customerName,customerEmailAddress,customerPhone,customerNotes,serviceNotes,startDateTime,endDateTime,customers,serviceLocation&$top=999`;
 
-    const response = await fetch(endpoint, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
+    console.log('[getBookingAppointments] Fetching from:', baseEndpoint);
+
+    const allAppointments: BookingAppointment[] = [];
+    let nextLink: string | null = baseEndpoint;
+    let pageCount = 0;
+
+    while (nextLink) {
+        pageCount++;
+        console.log(`[getBookingAppointments] Fetching page ${pageCount}...`);
+
+        const response = await fetch(nextLink, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[getBookingAppointments] Error:', response.status, errorText);
+            return allAppointments; // Return what we have so far
         }
-    });
 
-    if (!response.ok) {
-        return [];
+        const data = await response.json();
+        const appointments = data.value || [];
+        allAppointments.push(...appointments);
+
+        console.log(`[getBookingAppointments] Page ${pageCount}: got ${appointments.length} appointments (total: ${allAppointments.length})`);
+
+        // Check for next page
+        nextLink = data['@odata.nextLink'] || null;
+        if (nextLink) {
+            console.log('[getBookingAppointments] More pages available, continuing...');
+        }
     }
 
-    const data = await response.json();
-    return data.value;
+    console.log(`[getBookingAppointments] Finished: ${allAppointments.length} total appointments from ${pageCount} page(s)`);
+
+    if (allAppointments.length > 0) {
+        // Log date range of fetched appointments
+        const dates = allAppointments.map(a => a.startDateTime.dateTime).sort();
+        console.log(`[getBookingAppointments] Date range: ${dates[0]} to ${dates[dates.length - 1]}`);
+    }
+
+    return allAppointments;
 }
 
 // Get booking appointments via server-side PHP API (works for ALL users)

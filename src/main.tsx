@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { PublicClientApplication, EventType } from '@azure/msal-browser';
+import type { AuthenticationResult, EventMessage } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { msalConfig } from './services/authConfig';
 
@@ -14,11 +15,12 @@ if (!msalInstance.getActiveAccount() && msalInstance.getAllAccounts().length > 0
   msalInstance.setActiveAccount(msalInstance.getAllAccounts()[0]);
 }
 
-msalInstance.addEventCallback((event) => {
+msalInstance.addEventCallback((event: EventMessage) => {
   if (event.eventType === EventType.LOGIN_SUCCESS && event.payload) {
-    // @ts-ignore
-    const account = event.payload.account;
-    msalInstance.setActiveAccount(account);
+    const payload = event.payload as AuthenticationResult;
+    if (payload.account) {
+      msalInstance.setActiveAccount(payload.account);
+    }
   }
 });
 

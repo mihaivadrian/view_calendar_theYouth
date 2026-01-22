@@ -1,6 +1,6 @@
 import type { RoomId } from "../types/room";
 
-// Settings stored on server via PHP API
+// Settings stored on Express backend server
 // This ensures settings are shared across all users
 
 interface GlobalSettings {
@@ -9,11 +9,14 @@ interface GlobalSettings {
     updatedBy?: string;
 }
 
-// API endpoint - use relative path for production, absolute for development
+// API endpoint - use environment variable for Docker backend, otherwise use PHP endpoint
 const getApiUrl = () => {
-    if (window.location.hostname === 'localhost') {
-        return '/api/settings.php';
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+        // Local development with Docker backend
+        return `${apiUrl}/api/settings`;
     }
+    // Production uses PHP endpoint
     return '/api/settings.php';
 };
 

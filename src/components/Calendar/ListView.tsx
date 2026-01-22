@@ -1,25 +1,56 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { useRooms } from "../../hooks/useRooms";
 import { EventModal } from "./EventModal";
 import { RoomDetailModal } from "./RoomDetailModal";
 import type { CalendarEvent } from "../../types/calendar";
 import type { Room } from "../../types/room";
-import { format, parseISO, startOfDay, addDays, isSameDay } from "date-fns";
+import { format, parseISO, startOfDay, addDays, isSameDay, startOfMonth, endOfMonth, getMonth } from "date-fns";
 import { ro } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Calendar, Users, Clock } from "lucide-react";
 
 export const ListView: React.FC = () => {
-    const { events, loading } = useCalendarEvents();
-    const { rooms, selectedRoomIds } = useRooms();
+    const { events, loading, setDateRange } = useCalendarEvents();
+    const { rooms, selectedRoomIds, filterToActiveOnly } = useRooms();
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
 
+    // Track current month+year and update date range when it changes
+    const getMonthYearKey = (date: Date) => `${date.getFullYear()}-${getMonth(date)}`;
+    const currentMonthRef = useRef(getMonthYearKey(currentDate));
+
+    useEffect(() => {
+        const newMonthKey = getMonthYearKey(currentDate);
+        if (newMonthKey !== currentMonthRef.current) {
+            console.log(`%c[ListView] Month changed from ${currentMonthRef.current} to ${newMonthKey}`, 'background: orange; color: black;');
+            currentMonthRef.current = newMonthKey;
+            // Update calendar range to fetch events for the new month
+            const start = startOfMonth(currentDate);
+            const end = endOfMonth(currentDate);
+            console.log('[ListView] Fetching range:', start.toISOString(), 'to', end.toISOString());
+            setDateRange(start, end);
+        }
+    }, [currentDate, setDateRange]);
+
     // Get rooms that are selected
-    const activeRooms = useMemo(() => {
+    const selectedRooms = useMemo(() => {
         return rooms.filter(r => selectedRoomIds.includes(r.id));
     }, [rooms, selectedRoomIds]);
+
+    // Filter to only rooms with events when filterToActiveOnly is true
+    const activeRooms = useMemo(() => {
+        if (!filterToActiveOnly) {
+            return selectedRooms;
+        }
+        // Only show rooms that have events on current day
+        return selectedRooms.filter(room => {
+            return events.some(event => {
+                const eventDate = parseISO(event.start.dateTime);
+                return isSameDay(eventDate, currentDate) && event.roomId === room.id;
+            });
+        });
+    }, [selectedRooms, filterToActiveOnly, events, currentDate]);
 
     // Group events by room for current day
     const eventsByRoom = useMemo(() => {

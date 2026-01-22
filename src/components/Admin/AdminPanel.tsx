@@ -59,8 +59,10 @@ export const AdminPanel: React.FC = () => {
             }
 
             setDebugData(result);
-        } catch (error: any) {
-            setDebugData(`Eroare: ${error.message}\n\nStack: ${error.stack}`);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Eroare necunoscută";
+            const errorStack = error instanceof Error ? error.stack : "";
+            setDebugData(`Eroare: ${errorMessage}\n\nStack: ${errorStack}`);
         } finally {
             setLoadingDebug(false);
         }
