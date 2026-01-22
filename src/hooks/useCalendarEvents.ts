@@ -6,6 +6,47 @@ import { bookingSmartSyncService } from "../services/bookingSmartSyncService";
 import type { CalendarEvent } from "../types/calendar";
 import { startOfMonth, endOfMonth, parseISO, isSameDay, differenceInMinutes } from "date-fns";
 
+// Check if we're in production (no VITE_API_URL means using PHP backend)
+const isProduction = !import.meta.env.VITE_API_URL;
+
+// Fetch bookings directly from PHP API (production)
+async function fetchBookingsFromPHP(start: Date, end: Date): Promise<BookingAppointment[]> {
+    try {
+        const url = `/api/bookings.php?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+        console.log('[PHP API] Fetching bookings:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error('[PHP API] Error:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log(`[PHP API] Got ${data.length} bookings from server`);
+
+        // Transform PHP API response to match BookingAppointment format
+        return data.map((booking: Record<string, unknown>) => ({
+            id: booking.id,
+            customerName: booking.customerName || '',
+            customerEmailAddress: booking.customerEmailAddress || '',
+            customerPhone: booking.customerPhone || '',
+            serviceNotes: booking.serviceNotes || '',
+            customerNotes: booking.customerNotes || '',
+            startDateTime: booking.startDateTime as { dateTime: string; timeZone: string },
+            endDateTime: booking.endDateTime as { dateTime: string; timeZone: string },
+            serviceLocation: booking.serviceLocation as { displayName: string; locationEmailAddress?: string; locationUri?: string } | undefined,
+            customers: booking.customers as Array<{
+                name: string;
+                emailAddress: string;
+                customQuestionAnswers?: Array<{ question: string; answer: string }>;
+            }> || []
+        }));
+    } catch (error) {
+        console.error('[PHP API] Failed to fetch bookings:', error);
+        return [];
+    }
+}
+
 // Helper to parse date that might be in different formats
 function parseBookingDate(dateObj: { dateTime: string; timeZone: string }): Date {
     let dateStr = dateObj.dateTime;
@@ -296,13 +337,19 @@ export const useCalendarEvents = (initialDate: Date = new Date()) => {
                 }
             });
 
-            // 2. Get bookings from local IndexedDB
+            // 2. Get bookings - use PHP API on production, IndexedDB locally
             let bookingAppointments: BookingAppointment[] = [];
             try {
-                bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
-                console.log(`[Calendar] Got ${bookingAppointments.length} bookings from local DB`);
+                if (isProduction) {
+                    // Production: fetch directly from PHP API
+                    bookingAppointments = await fetchBookingsFromPHP(start, end);
+                } else {
+                    // Local dev: use IndexedDB
+                    bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
+                    console.log(`[Calendar] Got ${bookingAppointments.length} bookings from local DB`);
+                }
             } catch (dbErr) {
-                console.warn('[Calendar] Database error:', dbErr);
+                console.warn('[Calendar] Bookings error:', dbErr);
             }
 
             // 3. Process results
