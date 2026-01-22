@@ -18,14 +18,14 @@ export const ListView: React.FC = () => {
 
     // Track current month+year and update date range when it changes
     const getMonthYearKey = (date: Date) => `${date.getFullYear()}-${getMonth(date)}`;
-    const currentMonthRef = useRef(getMonthYearKey(currentDate));
+    const currentMonthRef = useRef<string>("");
 
     useEffect(() => {
         const newMonthKey = getMonthYearKey(currentDate);
-        if (newMonthKey !== currentMonthRef.current) {
-            console.log(`%c[ListView] Month changed from ${currentMonthRef.current} to ${newMonthKey}`, 'background: orange; color: black;');
+        // Always set date range on mount (when ref is empty) or when month changes
+        if (currentMonthRef.current !== newMonthKey) {
+            console.log(`%c[ListView] Setting date range for ${newMonthKey}`, 'background: orange; color: black;');
             currentMonthRef.current = newMonthKey;
-            // Update calendar range to fetch events for the new month
             const start = startOfMonth(currentDate);
             const end = endOfMonth(currentDate);
             console.log('[ListView] Fetching range:', start.toISOString(), 'to', end.toISOString());

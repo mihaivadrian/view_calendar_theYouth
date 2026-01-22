@@ -66,58 +66,40 @@ function normalizeRoomName(name: string): string {
 
 // Helper to check if booking location matches event room
 function locationMatchesRoom(booking: BookingAppointment, event: CalendarEvent): boolean {
-    if (!booking.serviceLocation) return false;
+    if (!booking.serviceLocation) {
+        console.log('[Match] No serviceLocation for booking:', booking.customerName);
+        return false;
+    }
 
     const bookingLocation = booking.serviceLocation.displayName || '';
-    const bookingEmail = booking.serviceLocation.locationEmailAddress || '';
-    // IMPORTANT: locationUri contains the actual room email (e.g., "TheWay@rotineret.ro")
     const bookingUri = (booking.serviceLocation as { locationUri?: string }).locationUri || '';
-
-    // Get event's room info
-    const eventLocation = event.location?.displayName || '';
     const eventRoomId = event.roomId || '';
 
-    // Normalize all names for comparison
-    const normalizedBookingLoc = normalizeRoomName(bookingLocation);
-    const normalizedEventLoc = normalizeRoomName(eventLocation);
-    const normalizedRoomId = normalizeRoomName(eventRoomId.split('@')[0]); // Extract name from email
+    // Debug log for matching
+    console.log(`[Match] Comparing booking "${booking.customerName}" loc="${bookingLocation}" uri="${bookingUri}" with event roomId="${eventRoomId}"`);
 
-    // Check if locationUri matches room ID exactly (most reliable match!)
+    // Check if locationUri matches room ID exactly (most reliable)
     if (bookingUri && eventRoomId && bookingUri.toLowerCase() === eventRoomId.toLowerCase()) {
+        console.log('[Match] ✓ URI match!');
         return true;
     }
 
-    // Check if location email matches room ID exactly
-    if (bookingEmail && eventRoomId && bookingEmail.toLowerCase() === eventRoomId.toLowerCase()) {
-        return true;
-    }
+    // Check normalized display names match
+    const normalizedBookingLoc = normalizeRoomName(bookingLocation);
+    const normalizedRoomId = normalizeRoomName(eventRoomId.split('@')[0]);
 
-    // Check normalized names match
-    if (normalizedBookingLoc && normalizedEventLoc) {
-        if (normalizedBookingLoc === normalizedEventLoc) return true;
-        if (normalizedBookingLoc.includes(normalizedEventLoc) || normalizedEventLoc.includes(normalizedBookingLoc)) return true;
-    }
-
-    // Check booking location against room ID name part
     if (normalizedBookingLoc && normalizedRoomId) {
-        if (normalizedBookingLoc === normalizedRoomId) return true;
-        if (normalizedBookingLoc.includes(normalizedRoomId) || normalizedRoomId.includes(normalizedBookingLoc)) return true;
+        if (normalizedBookingLoc === normalizedRoomId) {
+            console.log('[Match] ✓ Normalized name match!');
+            return true;
+        }
+        if (normalizedBookingLoc.includes(normalizedRoomId) || normalizedRoomId.includes(normalizedBookingLoc)) {
+            console.log('[Match] ✓ Partial name match!');
+            return true;
+        }
     }
 
-    // Try matching key words (e.g., "the way" should match "theway" or "the.way")
-    const bookingWords = bookingLocation.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    const eventWords = eventLocation.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    const roomIdWords = eventRoomId.split('@')[0].toLowerCase().split(/[.\-_]/).filter(w => w.length > 2);
-
-    // Check if all booking words appear in event location or room ID
-    if (bookingWords.length > 0) {
-        const allWordsMatch = bookingWords.every(bw =>
-            eventWords.some(ew => ew.includes(bw) || bw.includes(ew)) ||
-            roomIdWords.some(rw => rw.includes(bw) || bw.includes(rw))
-        );
-        if (allWordsMatch) return true;
-    }
-
+    console.log('[Match] ✗ No match');
     return false;
 }
 
