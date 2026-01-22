@@ -133,7 +133,7 @@ export const DebugPanel: React.FC = () => {
                         onClick={() => {
                             const logText = logs.map(log => {
                                 const time = log.timestamp.toLocaleTimeString();
-                                const dataStr = log.data && (log.data as unknown[]).length > 0
+                                const dataStr = Array.isArray(log.data) && log.data.length > 0
                                     ? '\n' + JSON.stringify(log.data, null, 2)
                                     : '';
                                 return `[${time}] ${log.message}${dataStr}`;
@@ -202,7 +202,7 @@ export const DebugPanel: React.FC = () => {
                                     }`}>
                                         {log.message}
                                     </div>
-                                    {log.data && Array.isArray(log.data) && log.data.length > 0 && (
+                                    {Array.isArray(log.data) && log.data.length > 0 && (
                                         <pre className="mt-1 text-gray-300 overflow-x-auto text-[10px]">
                                             {JSON.stringify(log.data, null, 2)}
                                         </pre>
