@@ -26,6 +26,9 @@ dist-ssr
 # Environment files
 .env
 
+# Documentation with secrets (local only)
+PRODUCTION_TROUBLESHOOTING.md
+
 # Backend data (SQLite databases)
 backend/data/*.db
 backend/data/*.db-shm
