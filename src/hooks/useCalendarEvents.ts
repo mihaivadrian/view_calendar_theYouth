@@ -307,26 +307,28 @@ export const useCalendarEvents = (initialDate: Date = new Date()) => {
                 }
             });
 
-            // 2. Get bookings - try API first, fall back to local IndexedDB
+            // 2. Get bookings - try local IndexedDB first, then API
+            // IndexedDB has data synced from user's session, server may not have credentials
             let bookingAppointments: BookingAppointment[] = [];
             try {
-                // Try to fetch from backend API
-                bookingAppointments = await fetchBookingsFromAPI(start, end);
+                // First try local IndexedDB (has user-synced data)
+                bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
+                console.log(`[Calendar] Got ${bookingAppointments.length} bookings from local DB`);
 
-                // If API returned empty or failed, try local IndexedDB as fallback
+                // If local is empty, try server API as fallback
                 if (bookingAppointments.length === 0) {
-                    console.log('[Calendar] API returned no bookings, trying local DB...');
-                    bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
-                    console.log(`[Calendar] Got ${bookingAppointments.length} bookings from local DB`);
+                    console.log('[Calendar] Local DB empty, trying API...');
+                    bookingAppointments = await fetchBookingsFromAPI(start, end);
+                    console.log(`[Calendar] Got ${bookingAppointments.length} bookings from API`);
                 }
             } catch (dbErr) {
                 console.warn('[Calendar] Bookings error:', dbErr);
-                // Try local DB as last resort
+                // Try API as fallback
                 try {
-                    bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
-                    console.log(`[Calendar] Fallback: Got ${bookingAppointments.length} bookings from local DB`);
-                } catch (localErr) {
-                    console.warn('[Calendar] Local DB also failed:', localErr);
+                    bookingAppointments = await fetchBookingsFromAPI(start, end);
+                    console.log(`[Calendar] Fallback API: Got ${bookingAppointments.length} bookings`);
+                } catch (apiErr) {
+                    console.warn('[Calendar] API also failed:', apiErr);
                 }
             }
 
