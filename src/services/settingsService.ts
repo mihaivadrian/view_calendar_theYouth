@@ -9,15 +9,11 @@ interface GlobalSettings {
     updatedBy?: string;
 }
 
-// API endpoint - use environment variable for Docker backend, otherwise use PHP endpoint
+// API endpoint - use Docker backend API
+// In production, nginx should proxy /api to the Docker backend
 const getApiUrl = () => {
-    const apiUrl = import.meta.env.VITE_API_URL;
-    if (apiUrl) {
-        // Local development with Docker backend
-        return `${apiUrl}/api/settings`;
-    }
-    // Production uses PHP endpoint
-    return '/api/settings.php';
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    return `${apiUrl}/api/settings`;
 };
 
 export const settingsService = {

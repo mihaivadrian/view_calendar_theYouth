@@ -6,43 +6,31 @@ import { bookingSmartSyncService } from "../services/bookingSmartSyncService";
 import type { CalendarEvent } from "../types/calendar";
 import { startOfMonth, endOfMonth, parseISO, isSameDay, differenceInMinutes } from "date-fns";
 
-// Check if we're in production (no VITE_API_URL means using PHP backend)
-const isProduction = !import.meta.env.VITE_API_URL;
+// API URL for bookings - uses Docker backend API
+// In production, nginx should proxy /api to the Docker backend
+const getBookingsApiUrl = (start: Date, end: Date) => {
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    return `${baseUrl}/api/bookings?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+};
 
-// Fetch bookings directly from PHP API (production)
-async function fetchBookingsFromPHP(start: Date, end: Date): Promise<BookingAppointment[]> {
+// Fetch bookings from backend API
+async function fetchBookingsFromAPI(start: Date, end: Date): Promise<BookingAppointment[]> {
     try {
-        const url = `/api/bookings.php?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
-        console.log('[PHP API] Fetching bookings:', url);
+        const url = getBookingsApiUrl(start, end);
+        console.log('[API] Fetching bookings:', url);
 
         const response = await fetch(url);
         if (!response.ok) {
-            console.error('[PHP API] Error:', response.status);
+            console.error('[API] Error:', response.status);
             return [];
         }
 
         const data = await response.json();
-        console.log(`[PHP API] Got ${data.length} bookings from server`);
+        console.log(`[API] Got ${data.length} bookings from server`);
 
-        // Transform PHP API response to match BookingAppointment format
-        return data.map((booking: Record<string, unknown>) => ({
-            id: booking.id,
-            customerName: booking.customerName || '',
-            customerEmailAddress: booking.customerEmailAddress || '',
-            customerPhone: booking.customerPhone || '',
-            serviceNotes: booking.serviceNotes || '',
-            customerNotes: booking.customerNotes || '',
-            startDateTime: booking.startDateTime as { dateTime: string; timeZone: string },
-            endDateTime: booking.endDateTime as { dateTime: string; timeZone: string },
-            serviceLocation: booking.serviceLocation as { displayName: string; locationEmailAddress?: string; locationUri?: string } | undefined,
-            customers: booking.customers as Array<{
-                name: string;
-                emailAddress: string;
-                customQuestionAnswers?: Array<{ question: string; answer: string }>;
-            }> || []
-        }));
+        return data as BookingAppointment[];
     } catch (error) {
-        console.error('[PHP API] Failed to fetch bookings:', error);
+        console.error('[API] Failed to fetch bookings:', error);
         return [];
     }
 }
@@ -319,19 +307,27 @@ export const useCalendarEvents = (initialDate: Date = new Date()) => {
                 }
             });
 
-            // 2. Get bookings - use PHP API on production, IndexedDB locally
+            // 2. Get bookings - try API first, fall back to local IndexedDB
             let bookingAppointments: BookingAppointment[] = [];
             try {
-                if (isProduction) {
-                    // Production: fetch directly from PHP API
-                    bookingAppointments = await fetchBookingsFromPHP(start, end);
-                } else {
-                    // Local dev: use IndexedDB
+                // Try to fetch from backend API
+                bookingAppointments = await fetchBookingsFromAPI(start, end);
+
+                // If API returned empty or failed, try local IndexedDB as fallback
+                if (bookingAppointments.length === 0) {
+                    console.log('[Calendar] API returned no bookings, trying local DB...');
                     bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
                     console.log(`[Calendar] Got ${bookingAppointments.length} bookings from local DB`);
                 }
             } catch (dbErr) {
                 console.warn('[Calendar] Bookings error:', dbErr);
+                // Try local DB as last resort
+                try {
+                    bookingAppointments = await bookingSmartSyncService.getBookings(start, end);
+                    console.log(`[Calendar] Fallback: Got ${bookingAppointments.length} bookings from local DB`);
+                } catch (localErr) {
+                    console.warn('[Calendar] Local DB also failed:', localErr);
+                }
             }
 
             // 3. Process results

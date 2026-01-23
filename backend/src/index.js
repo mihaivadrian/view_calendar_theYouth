@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { initDatabase, getBookings, getBookingsForMonth, getSyncStatus, storeBookingsForMonth, getSetting, saveSetting } from './database.js';
+import { syncAllBookings } from './syncService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,6 +54,24 @@ app.get('/api/sync/status', (req, res) => {
     } catch (error) {
         console.error('[API] Error getting sync status:', error);
         res.status(500).json({ error: 'Failed to get sync status' });
+    }
+});
+
+// Trigger full sync from Microsoft Graph API
+app.post('/api/sync/trigger', async (req, res) => {
+    console.log('[API] Sync trigger requested');
+    try {
+        const result = await syncAllBookings();
+        if (result.success) {
+            console.log(`[API] Sync complete: ${result.totalBookings} bookings across ${result.monthsSynced} months`);
+            res.json(result);
+        } else {
+            console.error('[API] Sync failed:', result.error);
+            res.status(500).json({ success: false, error: result.error || 'Sync failed' });
+        }
+    } catch (error) {
+        console.error('[API] Error triggering sync:', error);
+        res.status(500).json({ success: false, error: error.message || 'Failed to trigger sync' });
     }
 });
 
@@ -147,8 +166,34 @@ app.post('/api/settings', (req, res) => {
 
 console.log('[Server] Hybrid mode - frontend syncs, server stores');
 
+// Automatic sync interval (every 5 minutes)
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function runScheduledSync() {
+    console.log('[Scheduler] Running scheduled sync...');
+    try {
+        const result = await syncAllBookings();
+        if (result.success) {
+            console.log(`[Scheduler] Sync complete: ${result.totalBookings} bookings`);
+        } else {
+            console.warn('[Scheduler] Sync failed:', result.error);
+        }
+    } catch (error) {
+        console.error('[Scheduler] Sync error:', error);
+    }
+}
+
 // Start server
 app.listen(PORT, () => {
     console.log(`[Server] Youth Calendar Backend running on port ${PORT}`);
     console.log(`[Server] Sync scheduled every 5 minutes`);
+
+    // Run initial sync after startup (delay 10 seconds to let server stabilize)
+    setTimeout(() => {
+        console.log('[Server] Running initial sync...');
+        runScheduledSync();
+    }, 10000);
+
+    // Schedule regular syncs
+    setInterval(runScheduledSync, SYNC_INTERVAL_MS);
 });

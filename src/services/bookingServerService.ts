@@ -3,8 +3,10 @@
 
 import type { BookingAppointment } from './graphService';
 
-// Backend API URL - change this to your production URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Backend API URL - uses Docker backend
+// In production, nginx should proxy /api to the Docker backend at port 3001
+// In local dev, VITE_API_URL can be set to http://localhost:3001
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export interface SyncStatus {
     totalBookings: number;
